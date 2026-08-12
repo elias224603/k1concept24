@@ -1,4 +1,5 @@
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitroV2Plugin } from "@tanstack/nitro-v2-vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import {
@@ -19,65 +20,91 @@ const QUANTA_ICONS_SHIM = fileURLToPath(
   new URL("./src/lib/quanta-material-icons.ts", import.meta.url),
 );
 
+// Ablage der Formularanfragen: auf Cloudflare die D1-Datenbank, auf Vercel der
+// E-Mail-Versand. Der Tausch passiert hier, damit `cloudflare:workers` gar nicht
+// erst im Vercel-Bündel landet.
+const ANFRAGE_SPEICHER_VERCEL = fileURLToPath(
+  new URL("./src/lib/anfrage-speicher.vercel.ts", import.meta.url),
+);
+
 export default defineConfig(({ mode }) => {
-  const designInspectorEnabled = process.env.HF_DESIGN_INSPECTOR === "1" || mode === "design";
+  const designInspectorEnabled =
+    process.env.HF_DESIGN_INSPECTOR === "1" || mode === "design";
+
+  // Vercel setzt VERCEL=1 im Build-Container. Lokal lässt sich das Ziel mit
+  // DEPLOY_TARGET=vercel erzwingen (siehe `bun run build:vercel`).
+  const zielVercel =
+    process.env.VERCEL === "1" || process.env.DEPLOY_TARGET === "vercel";
+
+  const alias = [
+    { find: /^@higgsfield-ai\/icons(\/.*)?$/, replacement: QUANTA_ICONS_SHIM },
+    ...(zielVercel
+      ? [
+          {
+            // Muss den GANZEN Bezeichner treffen: Vite ersetzt nur den Treffer,
+            // ein Teiltreffer würde das führende "../" stehen lassen.
+            find: /^.*[\\/]anfrage-speicher$/,
+            replacement: ANFRAGE_SPEICHER_VERCEL,
+          },
+        ]
+      : []),
+  ];
 
   return {
-    resolve: {
-      alias: [{ find: /^@higgsfield-ai\/icons(\/.*)?$/, replacement: QUANTA_ICONS_SHIM }],
-    },
-    // The server bundle runs as a Cloudflare Worker — there is no node_modules
-    // at runtime. Vite's default SSR build leaves npm deps as bare external
-    // imports (h3, react, @tanstack/*, seroval, …), which resolve on a Node
-    // server but throw "No such module" in a Worker. Bundle them all in.
-    // (node: builtins stay external — nodejs_compat provides them.)
-    ssr: {
-      noExternal: true,
-      // `cloudflare:workers` is a workerd runtime built-in that exposes the Worker
-      // env / bindings (D1 `DB`, R2 `STORAGE`). Like node: builtins it must NOT be
-      // bundled; the runtime provides it. (`ssr.external` is typed string[].)
-      external: ["cloudflare:workers"],
-    },
-    build: {
-      // Keep `cloudflare:*` external in the SSR rollup pass too — `noExternal`
-      // above would otherwise try to resolve+bundle it and fail.
-      rollupOptions: { external: [/^cloudflare:/] },
-    },
+    resolve: { alias },
+
+    // Nur für Cloudflare: der Server läuft dort als Worker, es gibt zur Laufzeit
+    // kein node_modules. Vites SSR-Standard ließe npm-Abhängigkeiten als externe
+    // Importe stehen, die im Worker mit "No such module" scheitern. Auf Vercel
+    // läuft ein normaler Node-Server, dort ist das Bündeln unnötig und schädlich.
+    ...(zielVercel
+      ? {}
+      : {
+          ssr: {
+            noExternal: true,
+            // `cloudflare:workers` ist ein Laufzeitmodul von workerd und darf
+            // nicht gebündelt werden.
+            external: ["cloudflare:workers"],
+          },
+          build: {
+            rollupOptions: { external: [/^cloudflare:/] },
+          },
+        }),
+
     plugins: [
-      // Material Symbols SVGs (the app icon set) import as React components via
-      // `?react`. `icon: true` sizes them 1em; fill is forced to currentColor so
-      // they color like text (the raw SVGs have no fill attribute). Keep the
-      // viewBox so CSS sizing scales the glyph.
       svgr({
         svgrOptions: {
           icon: true,
           svgProps: { fill: "currentColor" },
           svgoConfig: {
             plugins: [
-              { name: "preset-default", params: { overrides: { removeViewBox: false } } },
+              {
+                name: "preset-default",
+                params: { overrides: { removeViewBox: false } },
+              },
             ],
           },
         },
       }),
-      // TanStack Start plugin must run before React's plugin.
+
+      // TanStack Start muss vor dem React-Plugin laufen.
       //
-      // SSR build: `vite build` emits a Workers-shaped server bundle
-      // (dist/server/server.js — `export default { fetch }`) plus dist/client
-      // (hashed static assets). The platform publishes that as a per-tenant
-      // Worker on Workers for Platforms, served at <sub>.higgsfield.app/ (host
-      // root, so Vite's default base "/" — no base-path juggling).
-      //
-      // Rendering happens on the server per request, so site code must be
-      // SSR-safe: never touch browser-only globals (window, document,
-      // localStorage, navigator) during render or at module top level — only
-      // inside effects/handlers, or guarded with `typeof window !== "undefined"`.
-      tanstackStart({
-        server: { entry: "server" },
-      }),
+      // Cloudflare: der eigene Worker-Einstieg src/server.ts wird gebaut
+      // (dist/server/server.js mit `export default { fetch }`).
+      // Vercel: der Standard-Einstieg von TanStack Start, den Nitro danach in
+      // das Vercel-Ausgabeformat (.vercel/output) verpackt.
+      tanstackStart(zielVercel ? {} : { server: { entry: "server" } }),
+
+      // Nur im Vercel-Build: Nitro erzeugt .vercel/output nach der Build Output
+      // API, die Vercel direkt ausliefert.
+      ...(zielVercel ? [nitroV2Plugin({ preset: "vercel" })] : []),
+
       higgsfieldDesignInspectorVitePlugin(designInspectorEnabled),
       react({
         babel: {
-          plugins: designInspectorEnabled ? [higgsfieldDesignSourceBabelPlugin] : [],
+          plugins: designInspectorEnabled
+            ? [higgsfieldDesignSourceBabelPlugin]
+            : [],
         },
       }),
       tailwindcss(),

@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { bindings } from "../bindings.server";
+// Beim Vercel-Build tauscht vite.config.ts dieses Modul gegen
+// `anfrage-speicher.vercel.ts` (E-Mail statt Datenbank).
+import { speichereAnfrage } from "../anfrage-speicher";
 
 const anfrageSchema = z.object({
   name: z.string().trim().min(2, "Bitte Namen angeben").max(120),
@@ -25,25 +27,15 @@ export const anfrageSenden = createServerFn({ method: "POST" })
       return { ok: true as const };
     }
 
-    const { DB } = bindings();
-    if (!DB) {
-      throw new Error("Datenbank nicht verfügbar");
-    }
-
-    await DB.prepare(
-      `INSERT INTO anfragen (name, telefon, email, ort, flaeche, leistung, nachricht)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        data.name,
-        data.telefon,
-        data.email || null,
-        data.ort || null,
-        data.flaeche || null,
-        data.leistung || null,
-        data.nachricht || null,
-      )
-      .run();
+    await speichereAnfrage({
+      name: data.name,
+      telefon: data.telefon,
+      email: data.email,
+      ort: data.ort,
+      flaeche: data.flaeche,
+      leistung: data.leistung,
+      nachricht: data.nachricht,
+    });
 
     return { ok: true as const };
   });

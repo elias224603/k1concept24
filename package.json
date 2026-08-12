@@ -1,0 +1,12 @@
+{
+  "name": "k1concept24",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Website für K1 concept 24, Bodenleger in Offenbach am Main",
+  "scripts": {
+    "dev": "cd app && bun run dev",
+    "build": "cd app && bun run build",
+    "build:vercel": "cd app && bun run build:vercel",
+    "typecheck": "cd app && bun run typecheck"
+  }
+}

@@ -5,6 +5,32 @@ import { betrieb, leistungen } from "../../data/site";
 
 type Status = "bereit" | "sendet" | "fertig" | "fehler";
 
+type Eingaben = {
+  name: string;
+  telefon: string;
+  email: string;
+  ort: string;
+  flaeche: string;
+  leistung: string;
+  nachricht: string;
+};
+
+/** Baut eine fertig ausgefüllte E-Mail, falls der Versand über den Server scheitert. */
+function baueMailLink(e: Eingaben): string {
+  const zeilen = [
+    `Name: ${e.name}`,
+    `Telefon: ${e.telefon}`,
+    e.email ? `E-Mail: ${e.email}` : "",
+    e.ort ? `Ort: ${e.ort}` : "",
+    e.flaeche ? `Fläche: ${e.flaeche} m²` : "",
+    e.leistung ? `Leistung: ${e.leistung}` : "",
+    e.nachricht ? `\n${e.nachricht}` : "",
+  ].filter(Boolean);
+  const betreff = encodeURIComponent(`Anfrage von ${e.name}`);
+  const koerper = encodeURIComponent(zeilen.join("\n"));
+  return `mailto:${betrieb.email}?subject=${betreff}&body=${koerper}`;
+}
+
 const feld =
   "mt-2 block w-full border border-ink/25 bg-limestone px-4 py-3 text-base text-ink placeholder:text-ink/35 transition-colors focus:border-signal focus:outline-none";
 const label = "block text-[0.7rem] uppercase tracking-[0.16em] text-inksoft";
@@ -18,6 +44,9 @@ export function Anfrage({
 }) {
   const [status, setStatus] = useState<Status>("bereit");
   const [fehler, setFehler] = useState<string | null>(null);
+  // Scheitert der Versand, bekommt der Besucher eine fertig ausgefüllte E-Mail,
+  // damit die Anfrage nicht verloren geht.
+  const [rueckfallLink, setRueckfallLink] = useState<string | null>(null);
 
   function umschalten(slug: string) {
     setGewaehlt(
@@ -43,31 +72,33 @@ export function Anfrage({
       return;
     }
 
+    const eingaben = {
+      name,
+      telefon,
+      email: String(daten.get("email") ?? ""),
+      ort: String(daten.get("ort") ?? ""),
+      flaeche: String(daten.get("flaeche") ?? ""),
+      leistung: gewaehlt
+        .map((s) => leistungen.find((l) => l.slug === s)?.titel ?? s)
+        .join(", "),
+      nachricht: String(daten.get("nachricht") ?? ""),
+      website: String(daten.get("website") ?? ""),
+    };
+
     setFehler(null);
+    setRueckfallLink(null);
     setStatus("sendet");
     try {
-      await anfrageSenden({
-        data: {
-          name,
-          telefon,
-          email: String(daten.get("email") ?? ""),
-          ort: String(daten.get("ort") ?? ""),
-          flaeche: String(daten.get("flaeche") ?? ""),
-          leistung: gewaehlt
-            .map((s) => leistungen.find((l) => l.slug === s)?.titel ?? s)
-            .join(", "),
-          nachricht: String(daten.get("nachricht") ?? ""),
-          website: String(daten.get("website") ?? ""),
-        },
-      });
+      await anfrageSenden({ data: eingaben });
       setStatus("fertig");
       form.reset();
       setGewaehlt([]);
     } catch {
       setStatus("fehler");
       setFehler(
-        "Das Formular konnte nicht abgeschickt werden. Bitte rufen Sie uns an.",
+        "Das Formular konnte gerade nicht abgeschickt werden. Ihre Angaben sind aber nicht verloren.",
       );
+      setRueckfallLink(baueMailLink(eingaben));
     }
   }
 
@@ -224,9 +255,28 @@ export function Anfrage({
                 </div>
 
                 {fehler ? (
-                  <p role="alert" className="mt-5 border-l-2 border-signal pl-3 text-sm text-ink">
-                    {fehler}
-                  </p>
+                  <div role="alert" className="mt-5 border-l-2 border-signal bg-limestone p-4">
+                    <p className="text-sm leading-relaxed text-ink">{fehler}</p>
+                    {rueckfallLink ? (
+                      <p className="mt-3 text-sm leading-relaxed text-inksoft">
+                        Schicken Sie sie einfach direkt:{" "}
+                        <a
+                          href={rueckfallLink}
+                          className="border-b border-signal text-ink"
+                        >
+                          als E-Mail öffnen
+                        </a>{" "}
+                        oder anrufen unter{" "}
+                        <a
+                          href={betrieb.telefonHref}
+                          className="border-b border-signal text-ink"
+                        >
+                          {betrieb.telefon}
+                        </a>
+                        .
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 {/* Stempel-CTA: presst sich beim Drücken ins Papier. */}
