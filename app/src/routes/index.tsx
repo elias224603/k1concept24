@@ -1,28 +1,73 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+
+import { Anfrage } from "../components/site/Anfrage";
+import { Aufbau } from "../components/site/Aufbau";
+import { Betrieb } from "../components/site/Betrieb";
+import { Hero } from "../components/site/Hero";
+import { Leistungen } from "../components/site/Leistungen";
+import { Projekte } from "../components/site/Projekte";
+import { RufLeiste } from "../components/site/RufLeiste";
+import { SiteFooter } from "../components/site/SiteFooter";
+import { SiteNav } from "../components/site/SiteNav";
+import { VorherNachher } from "../components/site/VorherNachher";
+import { betrieb, leistungen } from "../data/site";
 
 export const Route = createFileRoute("/")({
-  // No title/description here on purpose: the home page inherits the app's
-  // editable page metadata from the root route (set via the marketplace meta
-  // API — title/favicon/og), so a shared link to "/" shows the owner's values.
-  // Add a `head` here only to give a SPECIFIC page its own title/description
-  // (a deeper route's head overrides the root's for that page).
   component: Index,
 });
 
-// Replace this placeholder. Routes are server-rendered — keep render SSR-safe
-// (no window/document at module top level or during render). See ./README.md.
+const strukturierteDaten = {
+  "@context": "https://schema.org",
+  "@type": "HomeAndConstructionBusiness",
+  name: betrieb.name,
+  description:
+    "Parkettverlegung, Landhausdielen, Terrassendielen, Parkettsanierung und Bodenbeläge aller Art aus Offenbach am Main.",
+  founder: betrieb.inhaber,
+  telephone: "+49 179 9454659",
+  faxNumber: betrieb.fax,
+  email: betrieb.email,
+  vatID: betrieb.ustId.replace(/\s/g, ""),
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: betrieb.strasse,
+    postalCode: "63065",
+    addressLocality: "Offenbach am Main",
+    addressCountry: "DE",
+  },
+  areaServed: ["Offenbach am Main", "Frankfurt am Main", "Rhein-Main-Gebiet"],
+  knowsAbout: leistungen.map((l) => l.titel),
+};
+
 function Index() {
+  const [gewaehlt, setGewaehlt] = useState<string[]>([]);
+
+  function leistungWaehlen(slug: string) {
+    setGewaehlt((vorher) =>
+      vorher.includes(slug) ? vorher : [...vorher, slug],
+    );
+    const ziel = document.getElementById("anfrage");
+    ziel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
-    <div
-      data-higgsfield-blank-page-placeholder="REMOVE_THIS"
-      className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center"
-    >
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Your website will live here.
-      </h1>
-      <p className="text-base text-gray-500">
-        Ask Higgsfield Supercomputer to build it.
-      </p>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(strukturierteDaten) }}
+      />
+      <SiteNav />
+      <main>
+        <Hero />
+        <Leistungen onWaehlen={leistungWaehlen} />
+        <Aufbau />
+        <Projekte />
+        <VorherNachher />
+        <Betrieb />
+        <Anfrage gewaehlt={gewaehlt} setGewaehlt={setGewaehlt} />
+      </main>
+      <SiteFooter />
+      <RufLeiste />
+    </>
   );
 }

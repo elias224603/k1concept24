@@ -111,3 +111,125 @@
     border-color: var(--hf-color-border-default);
   }
 }
+
+/* =====================================================================
+ * K1 concept 24 — eigenständige Marken-Ebene (kein Quanta, keine q-*).
+ * Palette und Typografie sind in app/design-brief.md festgelegt.
+ * ===================================================================== */
+@theme {
+  --color-limestone: #ecede8;
+  --color-stone: #e1e3dc;
+  --color-chalk: #f6f7f3;
+  --color-ink: #15181b;
+  --color-inksoft: #5b6167;
+  --color-signal: #c6112b;
+
+  --font-display: "Cabinet Grotesk", "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: #ecede8;
+    color: #15181b;
+    font-family: var(--font-body);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background-color: #c6112b;
+    color: #ecede8;
+  }
+  :focus-visible {
+    outline: 2px solid #c6112b;
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* Einlauf beim Mount (nicht viewport-gesteuert): ist beim ersten Paint fertig. */
+@keyframes k1-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.k1-rise {
+  animation: k1-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Kapitel-Stack: gestapelte sticky-Ebenen. Bei reduzierter Bewegung
+ * fällt der Stack auf eine statische Abfolge zurück. */
+.k1-chapter {
+  position: sticky;
+  top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .k1-chapter {
+    position: relative;
+    height: auto;
+  }
+}
+
+/* Selbst gehostete Schriften (Fontshare, ITF Free Font License).
+ * Kein CDN-Abruf, damit keine Besucher-IP an Dritte geht. */
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/cabinet-grotesk-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/cabinet-grotesk-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Satoshi";
+  src: url("/assets/fonts/satoshi-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Satoshi";
+  src: url("/assets/fonts/satoshi-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Satoshi";
+  src: url("/assets/fonts/satoshi-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Display-Schnitt: Cabinet Grotesk trägt die Überschriften in 800. */
+.font-display {
+  font-weight: 800;
+}
